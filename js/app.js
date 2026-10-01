@@ -83,13 +83,14 @@ const events=[]; // Termine aus Outlook und Proton, Abruf folgt
 const templates=[];
 
 /* ---------- Zustand ---------- */
-const S={view:"dash",cat:"Alle",type:null,ignored:new Set(),accent:"#6aa9a6",calMode:"month",calMonth:new Date(TODAY.getFullYear(),TODAY.getMonth(),1),calSel:new Date(TODAY),calCat:"Alle",calType:null,period:"Jahr",nightFrom:"21:00",alarm:"06:30",cleanup:"90",archF:"Alle",archQ:"",archSel:null,syncedAt:null,lastBackup:null,lastMorning:null,lastNight:null,alarmSet:null};
-const SAVED_SETTINGS=["accent","nightFrom","alarm","cleanup","lastBackup","lastMorning","lastNight","alarmSet"];
+const S={view:"dash",cat:"Alle",type:null,ignored:new Set(),accent:"#6aa9a6",calMode:"month",calMonth:new Date(TODAY.getFullYear(),TODAY.getMonth(),1),calSel:new Date(TODAY),calCat:"Alle",calType:null,period:"Jahr",nightFrom:"21:00",alarm:"06:30",cleanup:"90",archF:"Alle",archQ:"",archSel:null,syncedAt:null,lastBackup:null,lastMorning:null,lastNight:null,alarmSet:null,backupSnooze:null};
+const SAVED_SETTINGS=["accent","nightFrom","alarm","cleanup","lastBackup","lastMorning","lastNight","alarmSet","backupSnooze"];
 function setAccent(c){S.accent=c;document.documentElement.style.setProperty("--accent",c)}
 
 /* ---------- Speichern ---------- */
 // Einträge werden als JSON gespeichert; nur geänderte Einträge werden geschrieben.
 const iso=d=>d?new Date(d).toISOString():null;
+function settingsObj(){const o={};SAVED_SETTINGS.forEach(k=>o[k]=S[k] instanceof Date?S[k].toISOString():S[k]);o.ignored=[...S.ignored];return o}
 const date=v=>v?new Date(v):null;
 function toRec(e){return{id:e.id,type:e.type,title:e.title,body:e.body,cat:e.cat,due:iso(e.due),repeat:e.repeat,star:e.star,status:e.status,created:iso(e.created),archived:iso(e.archived),
   items:e.items,links:e.links,photos:e.photos,order:e.order,chal:e.chal?{start:iso(e.chal.start),end:iso(e.chal.end),days:[...e.chal.days],result:e.chal.result}:null}}
@@ -103,7 +104,7 @@ function flush(){
   const put=[],seen=new Set();
   for(const e of entries){const r=toRec(e);const j=JSON.stringify(r);seen.add(e.id);if(snap.get(e.id)!==j){snap.set(e.id,j);put.push(r)}}
   const del=[];for(const id of snap.keys())if(!seen.has(id)){del.push(id);snap.delete(id)}
-  const settings={};SAVED_SETTINGS.forEach(k=>settings[k]=S[k] instanceof Date?S[k].toISOString():S[k]);settings.ignored=[...S.ignored];
+  const settings=settingsObj();
   const sj=JSON.stringify(settings),tj=JSON.stringify(templates);
   saving=saving.then(async()=>{
     await db.writeEntries(put,del);
@@ -125,6 +126,95 @@ async function hydratePhotos(root){
     if(!u){const b=pendingPhotos.get(id)||await db.getPhoto(id);if(!b)continue;u=URL.createObjectURL(b);photoUrls.set(id,u)}
     img.src=u;
   }
+}
+
+/* ---------- Sicherung ---------- */
+// Eine Sicherung ist eine JSON-Datei mit allen Einträgen, Vorlagen, Einstellungen und Fotos (Base64).
+const BACKUP_FORMAT="anton-backup";
+const blobToB64=b=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(",")[1]);r.onerror=()=>rej(r.error);r.readAsDataURL(b)});
+function b64ToBlob(b64,type){const bin=atob(b64);const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return new Blob([u],{type})}
+const mb=n=>n<1e6?Math.max(1,Math.round(n/1e3))+" KB":(n/1e6).toFixed(1).replace(".",",")+" MB";
+let backupFile=null,pendingRestore=null;
+// Schritt 1: Datei vorbereiten. Schritt 2 (Button im Fenster) öffnet das Teilen-Menü,
+// weil iOS das nur direkt nach einem Tippen erlaubt.
+async function prepareBackup(){
+  sheet(`<h2>Sicherung</h2><p class="sub">Wird vorbereitet …</p>`);
+  try{
+    flush();await saving;
+    const used=new Set(entries.flatMap(e=>e.photos));const photos=[];
+    for(const p of await db.allPhotos())if(used.has(p.id))photos.push({id:p.id,type:p.blob.type||"image/jpeg",data:await blobToB64(p.blob)});
+    const data={format:BACKUP_FORMAT,version:1,app:VERSION,created:new Date().toISOString(),entries:entries.map(toRec),templates,settings:settingsObj(),photos};
+    const name=`Anton-Sicherung-${key(NOW)}.json`;
+    backupFile=new File([JSON.stringify(data)],name,{type:"application/json"});
+    sheet(`<h2>Sicherung ist bereit</h2><p class="sub">${entries.length} Einträge · ${photos.length} ${photos.length===1?"Foto":"Fotos"} · ${mb(backupFile.size)}</p>
+      <p class="note">Im nächsten Fenster wählst du <b>In Dateien sichern</b> und dann einen Ordner, z. B. iCloud Drive oder „Auf meinem iPhone“. Jede Sicherung trägt das Datum im Namen, ältere werden nicht überschrieben.</p>
+      <button class="btn" data-act="backupShare" type="button">In Dateien sichern</button>`);
+  }catch(err){console.error(err);sheet(`<h2>Sicherung fehlgeschlagen</h2><p class="note">Die Daten konnten nicht zusammengestellt werden. Bitte versuche es noch einmal.</p>`)}
+}
+function shareBackup(){
+  const f=backupFile;if(!f)return;
+  const ok=()=>{S.lastBackup=new Date();S.backupSnooze=null;backupFile=null;closeSheet();render();refreshSettings();toast("Sicherung erstellt: "+f.name)};
+  if(navigator.canShare&&navigator.canShare({files:[f]})){
+    navigator.share({files:[f],title:f.name}).then(ok).catch(err=>{if(err&&err.name==="AbortError")toast("Sicherung abgebrochen");else{console.error(err);toast("Das Teilen-Menü ließ sich nicht öffnen.")}});
+  }else{
+    const a=document.createElement("a");a.href=URL.createObjectURL(f);a.download=f.name;document.body.appendChild(a);a.click();
+    setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},4000);ok();
+  }
+}
+function pickRestore(){
+  const inp=document.createElement("input");inp.type="file";inp.accept=".json,application/json";
+  inp.addEventListener("change",()=>{if(inp.files[0])readBackup(inp.files[0])});inp.click();
+}
+async function readBackup(f){
+  try{
+    const data=JSON.parse(await f.text());
+    if(data.format!==BACKUP_FORMAT||!Array.isArray(data.entries))throw new Error("kein Anton-Format");
+    pendingRestore=data;const c=new Date(data.created);
+    sheet(`<h2>Sicherung wiederherstellen?</h2><p class="sub">Vom ${dmy(c)} ${c.getFullYear()}, ${hm(c)} · ${data.entries.length} Einträge · ${(data.photos||[]).length} ${(data.photos||[]).length===1?"Foto":"Fotos"}</p>
+      <p class="note">Alle aktuellen Daten in Anton werden durch diese Sicherung ersetzt. Der jetzige Stand bleibt vorher als Schnappschuss erhalten.</p>
+      <button class="btn" data-act="restoreDo" type="button">Wiederherstellen</button><div style="height:10px"></div><button class="btn ghost" data-act="closeSheet" type="button">Abbrechen</button>`);
+  }catch(err){console.error(err);toast("Diese Datei ist keine Anton-Sicherung.")}
+}
+async function applyRestore(){
+  const data=pendingRestore;if(!data)return;
+  sheet(`<h2>Wird wiederhergestellt …</h2><p class="sub">Bitte Anton nicht schließen.</p>`);
+  try{
+    await takeSnapshot(true);
+    const photos=(data.photos||[]).map(p=>({id:p.id,blob:b64ToBlob(p.data,p.type)}));
+    await db.replaceAll({entries:data.entries,photos,templates:data.templates||[],settings:data.settings||settingsObj()});
+    location.reload();
+  }catch(err){console.error(err);sheet(`<h2>Wiederherstellen fehlgeschlagen</h2><p class="note">Deine bisherigen Daten sind unverändert. Ist der Speicher des iPhones voll?</p>`)}
+}
+
+/* ---------- Schnappschüsse ---------- */
+// Einmal pro Tag merkt sich Anton den Stand intern (ohne Fotos zu kopieren), die letzten drei bleiben.
+async function takeSnapshot(force){
+  const list=(await db.getKV("snapshots"))||[];
+  if(!force&&list.length&&list[0].day===key(TODAY))return;
+  if(!entries.length&&!force)return;
+  flush();await saving;
+  list.unshift({day:key(TODAY),at:new Date().toISOString(),entries:entries.map(toRec),templates:JSON.parse(JSON.stringify(templates))});
+  await db.setKV("snapshots",list.slice(0,3));
+}
+async function openSnapshots(){
+  const list=(await db.getKV("snapshots"))||[];
+  sheet(`<h2>Schnappschüsse</h2><p class="sub">Anton merkt sich jeden Tag den Stand. Die letzten drei bleiben erhalten.</p>
+    <div class="grp">${list.map((sn,i)=>{const d=new Date(sn.at);return `<div class="r"><span class="ri">${L("clock",16)}</span><span>${WD[d.getDay()]} ${dmy(d)}, ${hm(d)}<br><span class="muted" style="font-size:12px">${sn.entries.length} Einträge</span></span><button class="v a" data-act="snapRestore" data-v="${i}" type="button">Zurücksetzen</button></div>`}).join("")||'<div class="empty">Noch keine Schnappschüsse. Der erste entsteht beim nächsten Start.</div>'}</div>`);
+}
+async function restoreSnapshot(i){
+  const list=(await db.getKV("snapshots"))||[];const sn=list[i];if(!sn)return;
+  sheet(`<h2>Auf diesen Stand zurücksetzen?</h2><p class="sub">${dmy(new Date(sn.at))}, ${hm(new Date(sn.at))} · ${sn.entries.length} Einträge</p><p class="note">Der jetzige Stand wird vorher selbst als Schnappschuss gespeichert.</p>
+    <button class="btn" data-act="snapDo" data-v="${i}" type="button">Zurücksetzen</button><div style="height:10px"></div><button class="btn ghost" data-act="closeSheet" type="button">Abbrechen</button>`);
+}
+async function applySnapshot(i){
+  const list=(await db.getKV("snapshots"))||[];const sn=list[i];if(!sn)return;
+  try{await takeSnapshot(true);await db.replaceAll({entries:sn.entries,photos:null,templates:sn.templates||[],settings:settingsObj()});location.reload()}
+  catch(err){console.error(err);toast("Zurücksetzen fehlgeschlagen. Deine Daten sind unverändert.")}
+}
+function backupDue(){
+  if(!entries.length||S.backupSnooze===key(TODAY))return false;
+  if(!S.lastBackup){const first=Math.min(...entries.map(e=>+e.created));return daysBetween(new Date(first),TODAY)>=1}
+  return daysBetween(new Date(S.lastBackup),TODAY)>=7;
 }
 
 const isOpen=e=>e.status==="open";
@@ -176,6 +266,7 @@ function renderDash(){
   $("#app").innerHTML=`
   <header class="head"><h1>${WDL[NOW.getDay()]}</h1><span class="date">${dmy(NOW)} · ${dueN} fällig</span><span class="sp"></span>
   <button class="iconbtn" data-act="night" aria-label="Gute Nacht">${SV.moon}</button><button class="iconbtn" data-act="settings" aria-label="Einstellungen">${SV.gear}</button></header>
+  ${backupDue()?`<div class="bk"><span class="ri">${L("down",16)}</span><div class="bkt"><b>Zeit für eine Sicherung</b><span>${S.lastBackup?"Letzte Sicherung vor "+daysBetween(new Date(S.lastBackup),TODAY)+" Tagen":"Noch keine Sicherung vorhanden"}</span></div><button class="bkb" data-act="backup" type="button">Sichern</button><button class="bkx" data-act="bkLater" type="button" aria-label="Heute nicht mehr erinnern">✕</button></div>`:""}
   <div class="chips">${chips}</div>
   <div class="sec"><span>Heute</span><b>${ti.length} ${ti.length===1?"Termin":"Termine"}</b></div>
   ${S.syncedAt?`<div class="sync">Outlook und Proton abgerufen um ${hm(S.syncedAt)}</div>`:""}
@@ -489,6 +580,7 @@ function settingsHTML(){
   <div class="cap2">Daten</div><div class="grp">
    <button class="r" data-act="backup" type="button"><span class="ri">${L("down",16)}</span>Sicherung erstellen<span class="v">${S.lastBackup?(daysBetween(S.lastBackup,TODAY)===0?"heute":"vor "+daysBetween(S.lastBackup,TODAY)+" Tagen"):"noch keine"} ›</span></button>
    <button class="r" data-act="restoreBackup" type="button"><span class="ri">${L("up",16)}</span>Sicherung wiederherstellen<span class="v">›</span></button>
+   <button class="r" data-act="snapshots" type="button"><span class="ri">${L("clock",16)}</span>Schnappschüsse<span class="v">›</span></button>
    <div class="r"><span class="ri" style="background:#e5736b17;color:var(--danger)">${L("trash",16)}</span>Archiv bereinigen<select id="sClean">${[["0","Aus"],["30","älter als 30 Tage"],["60","älter als 60 Tage"],["90","älter als 90 Tage"],["180","älter als 180 Tage"]].map(([v,l])=>`<option value="${v}"${S.cleanup===v?" selected":""}>${l}</option>`).join("")}</select></div>
    <button class="r" data-act="tplList" type="button"><span class="ri">${L("template",16)}</span>Vorlagen<span class="v">${templates.length} ›</span></button></div>
   <p class="note">Anton · Version ${VERSION}<br>Alle Daten bleiben auf diesem iPhone.</p></div>`;
@@ -643,8 +735,14 @@ document.addEventListener("click",ev=>{
       <p class="note">Danach hier testen. iOS fragt beim ersten Mal, ob Anton den Kurzbefehl öffnen darf. Zurück zu Anton kommst du, indem du unten über den Home-Balken nach rechts wischst.</p>
       <a class="btn" href="${alarmURL(S.alarm)}" data-act="alarmGo">Testen mit ${S.alarm}</a>`),
     morning:()=>page(morningHTML(),"morning"),
-    backup:()=>toast("Die Sicherung in die Dateien-App folgt in einem der nächsten Updates."),
-    restoreBackup:()=>toast("Die Wiederherstellung folgt in einem der nächsten Updates."),
+    backup:()=>prepareBackup(),
+    backupShare:()=>shareBackup(),
+    bkLater:()=>{S.backupSnooze=key(TODAY);render()},
+    restoreBackup:()=>pickRestore(),
+    restoreDo:()=>applyRestore(),
+    snapshots:()=>openSnapshots(),
+    snapRestore:()=>restoreSnapshot(+v),
+    snapDo:()=>applySnapshot(+v),
     tplList:()=>sheet(`<h2>Vorlagen</h2><p class="sub">Neue Vorlagen speicherst du im Formular oder in der Detailansicht.</p><div class="grp">${templates.map((t,i)=>`<div class="r">${icon(t.type)}<span>${esc(t.title||t.type)}</span><button class="v" data-act="tplDel" data-v="${i}" style="color:var(--danger)">Entfernen</button></div>`).join("")||'<div class="empty">Keine Vorlagen</div>'}</div>`),
     tplDel:()=>{templates.splice(+v,1);A.tplList();refreshSettings()},
     alarmGo:()=>{S.alarmSet={day:key(TODAY),time:S.alarm};persist();location.href=alarmURL(S.alarm)},
@@ -660,7 +758,7 @@ document.addEventListener("keydown",e=>{
 });
 
 /* ---------- Start ---------- */
-const VERSION="0.2.1";
+const VERSION="0.3";
 function cleanupArchive(){
   const n=+S.cleanup;if(!n)return;
   for(let i=entries.length-1;i>=0;i--){const e=entries[i];if(!isOpen(e)&&e.archived&&daysBetween(e.archived,TODAY)>n)entries.splice(i,1)}
@@ -678,7 +776,7 @@ function autoViews(){
 let shownDay=null;
 document.addEventListener("visibilitychange",()=>{
   if(document.visibilityState!=="visible")return;
-  tick();if(shownDay!==key(TODAY)){shownDay=key(TODAY);cleanupArchive();render()}
+  tick();if(shownDay!==key(TODAY)){shownDay=key(TODAY);cleanupArchive();render();takeSnapshot(false).catch(()=>{})}
   autoViews();
 });
 async function start(){
@@ -694,6 +792,7 @@ async function start(){
   db.cleanupPhotos(new Set(entries.flatMap(e=>e.photos))).catch(()=>{});
   cleanupArchive();shownDay=key(TODAY);
   render();autoViews();
+  takeSnapshot(false).catch(err=>console.warn("Schnappschuss:",err));
   if("serviceWorker" in navigator&&location.protocol!=="file:"){
     // Neue Version: einmal neu laden, sobald der neue Service Worker übernimmt.
     const hadController=!!navigator.serviceWorker.controller;let reloaded=false;
