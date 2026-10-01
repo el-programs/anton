@@ -1,6 +1,6 @@
 // Service Worker: hält alle App-Dateien im Cache, damit Anton im Flugmodus startet.
 // Bei jeder Änderung an den App-Dateien VERSION erhöhen.
-const VERSION = "anton-v0.3.0";
+const VERSION = "anton-v0.3.1";
 const FILES = [
   "./",
   "index.html",
@@ -15,7 +15,7 @@ const FILES = [
 ];
 
 self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(FILES)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(FILES.map((f) => new Request(f, { cache: "reload" })))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener("activate", (e) => {

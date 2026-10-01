@@ -758,7 +758,7 @@ document.addEventListener("keydown",e=>{
 });
 
 /* ---------- Start ---------- */
-const VERSION="0.3";
+const VERSION="0.3.1";
 function cleanupArchive(){
   const n=+S.cleanup;if(!n)return;
   for(let i=entries.length-1;i>=0;i--){const e=entries[i];if(!isOpen(e)&&e.archived&&daysBetween(e.archived,TODAY)>n)entries.splice(i,1)}
@@ -797,7 +797,10 @@ async function start(){
     // Neue Version: einmal neu laden, sobald der neue Service Worker übernimmt.
     const hadController=!!navigator.serviceWorker.controller;let reloaded=false;
     navigator.serviceWorker.addEventListener("controllerchange",()=>{if(hadController&&!reloaded){reloaded=true;flush();setTimeout(()=>location.reload(),150)}});
-    navigator.serviceWorker.register("sw.js").catch(err=>console.warn("Service Worker:",err));
+    // updateViaCache "none": sw.js nie aus dem HTTP-Cache, damit Updates sofort erkannt werden.
+    navigator.serviceWorker.register("sw.js",{updateViaCache:"none"}).then(reg=>{
+      document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")reg.update().catch(()=>{})});
+    }).catch(err=>console.warn("Service Worker:",err));
   }
 }
 start();
