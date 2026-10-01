@@ -650,7 +650,7 @@ document.addEventListener("keydown",e=>{
 });
 
 /* ---------- Start ---------- */
-const VERSION="0.1";
+const VERSION="0.1.2";
 function cleanupArchive(){
   const n=+S.cleanup;if(!n)return;
   for(let i=entries.length-1;i>=0;i--){const e=entries[i];if(!isOpen(e)&&e.archived&&daysBetween(e.archived,TODAY)>n)entries.splice(i,1)}
@@ -684,6 +684,11 @@ async function start(){
   db.cleanupPhotos(new Set(entries.flatMap(e=>e.photos))).catch(()=>{});
   cleanupArchive();shownDay=key(TODAY);
   render();autoViews();
-  if("serviceWorker" in navigator&&location.protocol!=="file:")navigator.serviceWorker.register("sw.js").catch(err=>console.warn("Service Worker:",err));
+  if("serviceWorker" in navigator&&location.protocol!=="file:"){
+    // Neue Version: einmal neu laden, sobald der neue Service Worker übernimmt.
+    const hadController=!!navigator.serviceWorker.controller;let reloaded=false;
+    navigator.serviceWorker.addEventListener("controllerchange",()=>{if(hadController&&!reloaded){reloaded=true;flush();setTimeout(()=>location.reload(),150)}});
+    navigator.serviceWorker.register("sw.js").catch(err=>console.warn("Service Worker:",err));
+  }
 }
 start();
