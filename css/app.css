@@ -268,3 +268,8 @@ ol.steps{margin:0 0 16px;padding-left:20px;color:#c9c9cd;line-height:1.6;font-si
 .ph{position:relative;display:block;padding:0;border-radius:12px;overflow:hidden;background:var(--surface)}
 .ph img{width:100%;aspect-ratio:1;object-fit:cover;display:block}
 .phx{position:absolute;top:6px;right:6px;width:26px;height:26px;border-radius:13px;background:rgba(0,0,0,.65);color:#fff;font-size:12px}
+
+.lnk{color:var(--accent);font-size:inherit;text-decoration:underline;text-underline-offset:2px}
+a.btn{text-decoration:none}
+ol.steps b{color:var(--fg);font-weight:600}
+.alarm input{font-size:54px!important}

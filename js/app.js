@@ -83,8 +83,8 @@ const events=[]; // Termine aus Outlook und Proton, Abruf folgt
 const templates=[];
 
 /* ---------- Zustand ---------- */
-const S={view:"dash",cat:"Alle",type:null,ignored:new Set(),accent:"#6aa9a6",calMode:"month",calMonth:new Date(TODAY.getFullYear(),TODAY.getMonth(),1),calSel:new Date(TODAY),calCat:"Alle",calType:null,period:"Jahr",nightFrom:"21:00",alarm:"06:30",cleanup:"90",archF:"Alle",archQ:"",archSel:null,syncedAt:null,lastBackup:null,lastMorning:null,lastNight:null};
-const SAVED_SETTINGS=["accent","nightFrom","alarm","cleanup","lastBackup","lastMorning","lastNight"];
+const S={view:"dash",cat:"Alle",type:null,ignored:new Set(),accent:"#6aa9a6",calMode:"month",calMonth:new Date(TODAY.getFullYear(),TODAY.getMonth(),1),calSel:new Date(TODAY),calCat:"Alle",calType:null,period:"Jahr",nightFrom:"21:00",alarm:"06:30",cleanup:"90",archF:"Alle",archQ:"",archSel:null,syncedAt:null,lastBackup:null,lastMorning:null,lastNight:null,alarmSet:null};
+const SAVED_SETTINGS=["accent","nightFrom","alarm","cleanup","lastBackup","lastMorning","lastNight","alarmSet"];
 function setAccent(c){S.accent=c;document.documentElement.style.setProperty("--accent",c)}
 
 /* ---------- Speichern ---------- */
@@ -484,7 +484,7 @@ function settingsHTML(){
    <button class="r" data-act="ignored" type="button"><span class="ri">${L("eye",16)}</span>Ignorierte Termine<span class="v">${S.ignored.size} ›</span></button></div>
   <div class="cap2">Abend und Morgen</div><div class="grp">
    <div class="r"><span class="ri" style="background:#8e8e9324">${SV.moon}</span>Gute Nacht ab<input type="time" id="sNight" value="${S.nightFrom}"></div>
-   <button class="r" data-act="shortcut" type="button"><span class="ri">${L("alarm",16)}</span>Wecker-Kurzbefehl<span class="v">einrichten ›</span></button>
+   <button class="r" data-act="shortcut" type="button"><span class="ri">${L("alarm",16)}</span>Wecker-Kurzbefehl<span class="v">${S.alarmSet?"eingerichtet ›":"einrichten ›"}</span></button>
    <button class="r" data-act="morning" type="button"><span class="ri" style="background:#ffd60a24">${SV.sun}</span>Guten Morgen ansehen<span class="v">›</span></button></div>
   <div class="cap2">Daten</div><div class="grp">
    <button class="r" data-act="backup" type="button"><span class="ri">${L("down",16)}</span>Sicherung erstellen<span class="v">${S.lastBackup?(daysBetween(S.lastBackup,TODAY)===0?"heute":"vor "+daysBetween(S.lastBackup,TODAY)+" Tagen"):"noch keine"} ›</span></button>
@@ -498,6 +498,9 @@ function refreshSettings(){persist();const p=$("#layer .page.settings");if(!p)re
 function bindSettings(){const n=$("#sNight");n&&n.addEventListener("change",()=>{S.nightFrom=n.value||S.nightFrom;persist();toast("Gute Nacht erscheint ab "+n.value)});const c=$("#sClean");c&&c.addEventListener("change",()=>{S.cleanup=c.value;persist();cleanupArchive();render();toast(c.value==="0"?"Automatische Bereinigung aus":"Archiv wird automatisch bereinigt")})}
 
 /* ---------- Gute Nacht / Guten Morgen ---------- */
+// Startet den Kurzbefehl „Anton Wecker“ und übergibt die Weckzeit als Text, z. B. "06:30".
+const SHORTCUT="Anton Wecker";
+const alarmURL=t=>`shortcuts://run-shortcut?name=${encodeURIComponent(SHORTCUT)}&input=text&text=${encodeURIComponent(t)}`;
 function sleepText(){const [h,m]=S.alarm.split(":").map(Number);const a=new Date();a.setHours(h,m,0,0);if(a<=new Date())a.setDate(a.getDate()+1);const mins=Math.round((a-new Date())/6e4);return Math.floor(mins/60)+" Std. "+(mins%60)+" Min. bis zum Wecker"}
 function nightHTML(){
   const tm=addD(TODAY,1);const its=dayItems(tm);
@@ -508,10 +511,10 @@ function nightHTML(){
   <div class="gn-head" style="padding-top:0"><span class="mi" style="background:#8e8e9322">${SV.moon}</span>Gute Nacht</div>
   <div class="gn-big">Morgen, ${WDL[tm.getDay()]} ${dmy(tm)}</div>
   <div class="alarm"><div class="lb">Wecker</div><input type="time" id="nAlarm" value="${S.alarm}" aria-label="Weckzeit"><div class="h" id="nSleep">${sleepText()}</div>
-  <button class="btn" data-act="alarmGo" type="button"><span style="display:inline-flex;vertical-align:-3px;margin-right:6px">${L("alarm",18)}</span>Wecker in Uhr-App stellen</button><div class="sm">über den Kurzbefehl „Anton Wecker“</div></div>
+  <a class="btn" id="nAlarmGo" href="${alarmURL(S.alarm)}" data-act="alarmGo"><span style="display:inline-flex;vertical-align:-3px;margin-right:6px">${L("alarm",18)}</span>Wecker in Uhr-App stellen</a><div class="sm">${S.alarmSet&&S.alarmSet.day===key(TODAY)?`Zuletzt gestellt: ${S.alarmSet.time} · `:""}über den Kurzbefehl „Anton Wecker“ · <button class="lnk" data-act="shortcut" type="button">einrichten</button></div></div></div>
   <div class="sec" style="margin-top:8px"><span>Morgen</span><span>${all.length}</span></div><div class="pad">${all.map(liHTML).join("")||'<div class="empty">Morgen ist nichts geplant</div>'}</div>`;
 }
-function openNight(){page(nightHTML(),"night");const a=$("#nAlarm");a.addEventListener("input",()=>{S.alarm=a.value||S.alarm;$("#nSleep").textContent=sleepText();persist()})}
+function openNight(){page(nightHTML(),"night");const a=$("#nAlarm");a.addEventListener("input",()=>{S.alarm=a.value||S.alarm;$("#nSleep").textContent=sleepText();$("#nAlarmGo").href=alarmURL(S.alarm);persist()})}
 function morningHTML(){
   const ti=todayItems();const due=entries.filter(e=>isOpen(e)&&e.type!=="Termin"&&e.due&&same(e.due,TODAY)&&!isOver(e));const over=entries.filter(isOver);
   const chals=entries.filter(e=>isOpen(e)&&e.type==="Challenge"&&chalInfo(e));
@@ -631,13 +634,20 @@ document.addEventListener("click",ev=>{
     icsInfo:()=>sheet(`<h2>${v}-Kalender</h2><p class="sub">Schreibgeschütztes Abo per ICS-Link</p><p class="note">Hier fügst du später den Freigabe-Link aus ${v} ein. Anton ruft ihn bei jedem Start ab und zeigt die Termine nur an.</p><p class="note">Diese Funktion folgt in einem der nächsten Updates.</p><button class="btn ghost" data-act="closeSheet">Schließen</button>`),
     ignored:()=>{const list=events.filter(x=>S.ignored.has(x.id));sheet(`<h2>Ignorierte Termine</h2><p class="sub">Einblenden holt den Termin zurück ins Dashboard.</p><div class="grp">${list.map(x=>`<div class="r"><span class="ri" style="background:${SRC[x.src]}17;color:${SRC[x.src]}">${L("cal",16)}</span><span>${esc(x.title)}<br><span class="muted" style="font-size:12px">${dmy(x.start)} · ${x.src}</span></span><button class="v a" data-act="unignore" data-id="${x.id}">Einblenden</button></div>`).join("")||'<div class="empty">Keine ignorierten Termine. Tippe im Dashboard auf einen Outlook- oder Proton-Termin, um ihn auszublenden.</div>'}</div>`)},
     unignore:()=>{S.ignored.delete(id);A.ignored();refreshSettings();render()},
-    shortcut:()=>sheet(`<h2>Wecker-Kurzbefehl</h2><p class="sub">Einmalig einrichten, danach stellt Anton den Wecker mit einem Tipp.</p><ol class="steps"><li>Kurzbefehle-App öffnen, neuen Kurzbefehl „Anton Wecker“ anlegen.</li><li>Aktion „Wecker erstellen“ hinzufügen, Uhrzeit aus der Eingabe übernehmen.</li><li>In Anton auf „Wecker in Uhr-App stellen“ tippen.</li></ol><p class="note">Der Button in „Gute Nacht“ wird im nächsten Schritt angeschlossen. Ob iOS das aus der Web-App ohne Rückfrage zulässt, testen wir auf deinem iPhone.</p><button class="btn ghost" data-act="closeSheet">Verstanden</button>`),
+    shortcut:()=>sheet(`<h2>Wecker-Kurzbefehl</h2><p class="sub">Einmal einrichten, danach stellt Anton den Wecker mit einem Tipp.</p>
+      <ol class="steps"><li>Öffne die App <b>Kurzbefehle</b> und tippe oben rechts auf <b>+</b>.</li>
+      <li>Tippe oben auf den Namen und nenne den Kurzbefehl genau <b>Anton Wecker</b>.</li>
+      <li>Füge die Aktion <b>Datumsangaben abrufen</b> hinzu. Als Eingabe wählst du <b>Kurzbefehleingabe</b>.</li>
+      <li>Füge die Aktion <b>Wecker erstellen</b> hinzu und setze als Uhrzeit die <b>Datumsangaben</b> aus Schritt 3. Als Bezeichnung kannst du „Anton“ eintragen.</li>
+      <li>Tippe unten auf das Info-Symbol und stelle bei <b>Eingabe empfangen</b> den Typ <b>Text</b> ein. Dann auf <b>Fertig</b>.</li></ol>
+      <p class="note">Danach hier testen. iOS fragt beim ersten Mal, ob Anton den Kurzbefehl öffnen darf. Mit „Zurück zu Anton“ oben links kommst du zurück.</p>
+      <a class="btn" href="${alarmURL(S.alarm)}" data-act="alarmGo">Testen mit ${S.alarm}</a>`),
     morning:()=>page(morningHTML(),"morning"),
     backup:()=>toast("Die Sicherung in die Dateien-App folgt in einem der nächsten Updates."),
     restoreBackup:()=>toast("Die Wiederherstellung folgt in einem der nächsten Updates."),
     tplList:()=>sheet(`<h2>Vorlagen</h2><p class="sub">Neue Vorlagen speicherst du im Formular oder in der Detailansicht.</p><div class="grp">${templates.map((t,i)=>`<div class="r">${icon(t.type)}<span>${esc(t.title||t.type)}</span><button class="v" data-act="tplDel" data-v="${i}" style="color:var(--danger)">Entfernen</button></div>`).join("")||'<div class="empty">Keine Vorlagen</div>'}</div>`),
     tplDel:()=>{templates.splice(+v,1);A.tplList();refreshSettings()},
-    alarmGo:()=>toast("Der Wecker-Kurzbefehl folgt in einem der nächsten Updates. Weckzeit "+S.alarm+" ist gespeichert."),
+    alarmGo:()=>{S.alarmSet={day:key(TODAY),time:S.alarm};persist();location.href=alarmURL(S.alarm)},
     photo:()=>{const u=photoUrls.get(v);if(u)sheet(`<img src="${u}" alt="Foto" style="width:100%;border-radius:14px;display:block;margin-top:24px">`)},
     fPhotoDel:()=>{const [id]=F.photos.splice(+v,1);pendingPhotos.delete(id);refreshForm()}
   };
@@ -650,7 +660,7 @@ document.addEventListener("keydown",e=>{
 });
 
 /* ---------- Start ---------- */
-const VERSION="0.1.2";
+const VERSION="0.2";
 function cleanupArchive(){
   const n=+S.cleanup;if(!n)return;
   for(let i=entries.length-1;i>=0;i--){const e=entries[i];if(!isOpen(e)&&e.archived&&daysBetween(e.archived,TODAY)>n)entries.splice(i,1)}
