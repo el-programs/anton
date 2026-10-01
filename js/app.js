@@ -511,7 +511,7 @@ function nightHTML(){
   <div class="gn-head" style="padding-top:0"><span class="mi" style="background:#8e8e9322">${SV.moon}</span>Gute Nacht</div>
   <div class="gn-big">Morgen, ${WDL[tm.getDay()]} ${dmy(tm)}</div>
   <div class="alarm"><div class="lb">Wecker</div><input type="time" id="nAlarm" value="${S.alarm}" aria-label="Weckzeit"><div class="h" id="nSleep">${sleepText()}</div>
-  <a class="btn" id="nAlarmGo" href="${alarmURL(S.alarm)}" data-act="alarmGo"><span style="display:inline-flex;vertical-align:-3px;margin-right:6px">${L("alarm",18)}</span>Wecker in Uhr-App stellen</a><div class="sm">${S.alarmSet&&S.alarmSet.day===key(TODAY)?`Zuletzt gestellt: ${S.alarmSet.time} · `:""}über den Kurzbefehl „Anton Wecker“ · <button class="lnk" data-act="shortcut" type="button">einrichten</button></div></div></div>
+  <a class="btn" id="nAlarmGo" href="${alarmURL(S.alarm)}" data-act="alarmGo"><span style="display:inline-flex;vertical-align:-3px;margin-right:6px">${L("alarm",18)}</span>Wecker in Uhr-App stellen</a><div class="sm">${S.alarmSet&&S.alarmSet.day===key(TODAY)?`Zuletzt gestellt: ${S.alarmSet.time} · `:""}danach unten über den Home-Balken nach rechts wischen · <button class="lnk" data-act="shortcut" type="button">einrichten</button></div></div></div>
   <div class="sec" style="margin-top:8px"><span>Morgen</span><span>${all.length}</span></div><div class="pad">${all.map(liHTML).join("")||'<div class="empty">Morgen ist nichts geplant</div>'}</div>`;
 }
 function openNight(){page(nightHTML(),"night");const a=$("#nAlarm");a.addEventListener("input",()=>{S.alarm=a.value||S.alarm;$("#nSleep").textContent=sleepText();$("#nAlarmGo").href=alarmURL(S.alarm);persist()})}
@@ -640,7 +640,7 @@ document.addEventListener("click",ev=>{
       <li>Füge die Aktion <b>Datumsangaben abrufen</b> hinzu. Als Eingabe wählst du <b>Kurzbefehleingabe</b>.</li>
       <li>Füge die Aktion <b>Wecker erstellen</b> hinzu und setze als Uhrzeit die <b>Datumsangaben</b> aus Schritt 3. Als Bezeichnung kannst du „Anton“ eintragen.</li>
       <li>Tippe unten auf das Info-Symbol und stelle bei <b>Eingabe empfangen</b> den Typ <b>Text</b> ein. Dann auf <b>Fertig</b>.</li></ol>
-      <p class="note">Danach hier testen. iOS fragt beim ersten Mal, ob Anton den Kurzbefehl öffnen darf. Mit „Zurück zu Anton“ oben links kommst du zurück.</p>
+      <p class="note">Danach hier testen. iOS fragt beim ersten Mal, ob Anton den Kurzbefehl öffnen darf. Zurück zu Anton kommst du, indem du unten über den Home-Balken nach rechts wischst.</p>
       <a class="btn" href="${alarmURL(S.alarm)}" data-act="alarmGo">Testen mit ${S.alarm}</a>`),
     morning:()=>page(morningHTML(),"morning"),
     backup:()=>toast("Die Sicherung in die Dateien-App folgt in einem der nächsten Updates."),
@@ -660,7 +660,7 @@ document.addEventListener("keydown",e=>{
 });
 
 /* ---------- Start ---------- */
-const VERSION="0.2";
+const VERSION="0.2.1";
 function cleanupArchive(){
   const n=+S.cleanup;if(!n)return;
   for(let i=entries.length-1;i>=0;i--){const e=entries[i];if(!isOpen(e)&&e.archived&&daysBetween(e.archived,TODAY)>n)entries.splice(i,1)}
