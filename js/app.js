@@ -609,7 +609,6 @@ function nightHTML(){
   <div class="gn-head" style="padding-top:0"><span class="mi" style="background:#8e8e9322">${SV.moon}</span>Gute Nacht</div>
   <div class="gn-big">Morgen, ${WDL[tm.getDay()]} ${dmy(tm)}</div>
   ${alarmBlock()}
-  <a class="btn" id="nAlarmGo" href="${alarmURL(S.alarm)}" data-act="alarmGo"><span style="display:inline-flex;vertical-align:-3px;margin-right:6px">${L("alarm",18)}</span>Wecker in Uhr-App stellen</a><div class="sm">${S.alarmSet&&S.alarmSet.day===key(TODAY)?`Zuletzt gestellt: ${S.alarmSet.time} · `:""}danach unten über den Home-Balken nach rechts wischen · <button class="lnk" data-act="shortcut" type="button">einrichten</button></div></div></div>
   <div class="sec" style="margin-top:8px"><span>Morgen</span><span>${all.length}</span></div><div class="pad">${all.map(liHTML).join("")||'<div class="empty">Morgen ist nichts geplant</div>'}</div>`;
 }
 function alarmBlock(){
@@ -781,7 +780,7 @@ document.addEventListener("keydown",e=>{
 });
 
 /* ---------- Start ---------- */
-const VERSION="0.4";
+const VERSION="0.4.1";
 function cleanupArchive(){
   const n=+S.cleanup;if(!n)return;
   for(let i=entries.length-1;i>=0;i--){const e=entries[i];if(!isOpen(e)&&e.archived&&daysBetween(e.archived,TODAY)>n)entries.splice(i,1)}
