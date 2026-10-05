@@ -1,6 +1,6 @@
 // Service Worker: hält alle App-Dateien im Cache, damit Anton im Flugmodus startet.
 // Bei jeder Änderung an den App-Dateien VERSION erhöhen.
-const VERSION = "anton-v0.3.1";
+const VERSION = "anton-v0.4.0";
 const FILES = [
   "./",
   "index.html",

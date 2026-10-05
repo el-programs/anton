@@ -283,3 +283,5 @@ ol.steps b{color:var(--fg);font-weight:600}
 .bkb{flex:none;background:var(--accent);color:var(--on-accent);font-weight:650;font-size:13px;padding:7px 12px;border-radius:10px}
 .bkx{flex:none;color:var(--muted);width:26px;height:26px;font-size:12px}
 .note b{color:var(--fg);font-weight:600}
+.appname{font-size:28px;font-weight:600;margin:6px 0 4px}
+.rin{margin-left:auto;background:var(--raise);border:0;border-radius:8px;padding:6px 8px;color:var(--accent);max-width:55%;text-align:right;outline:none}
