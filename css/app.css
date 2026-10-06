@@ -237,11 +237,6 @@ ol.steps{margin:0 0 16px;padding-left:20px;color:#c9c9cd;line-height:1.6;font-si
 .mi{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;flex:none}
 .mi svg{width:22px;height:22px}
 .gn-big{font-size:20px;font-weight:650;margin:10px 20px 16px}
-.alarm{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:18px;text-align:center;margin:0 16px}
-.alarm .lb{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;font-weight:700}
-.alarm input{background:none;border:0;color:var(--fg);font-size:54px;font-weight:300;text-align:center;width:100%;font-variant-numeric:tabular-nums;outline:none;padding:0}
-.alarm .h{font-size:13px;color:var(--muted);margin-bottom:14px}
-.alarm .sm{font-size:12px;color:var(--muted);margin-top:8px}
 .hello{margin:12px 16px 0;background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 22%,#000),color-mix(in srgb,var(--accent) 6%,#000));border:1px solid color-mix(in srgb,var(--accent) 30%,transparent);border-radius:20px;padding:18px}
 .hello .g{font-size:20px;font-weight:650}
 .hello .s{color:var(--muted);font-size:14px;margin-top:2px}
@@ -272,7 +267,6 @@ ol.steps{margin:0 0 16px;padding-left:20px;color:#c9c9cd;line-height:1.6;font-si
 .lnk{color:var(--accent);font-size:inherit;text-decoration:underline;text-underline-offset:2px}
 a.btn{text-decoration:none}
 ol.steps b{color:var(--fg);font-weight:600}
-.alarm input{font-size:54px!important}
 
 /* Sicherungs-Hinweis */
 .bk{display:flex;align-items:center;gap:12px;margin:6px 16px 4px;padding:12px 12px 12px 14px;border-radius:14px;background:color-mix(in srgb,var(--accent) 10%,#000);border:1px solid color-mix(in srgb,var(--accent) 28%,transparent)}
@@ -283,5 +277,6 @@ ol.steps b{color:var(--fg);font-weight:600}
 .bkb{flex:none;background:var(--accent);color:var(--on-accent);font-weight:650;font-size:13px;padding:7px 12px;border-radius:10px}
 .bkx{flex:none;color:var(--muted);width:26px;height:26px;font-size:12px}
 .note b{color:var(--fg);font-weight:600}
-.appname{font-size:28px;font-weight:600;margin:6px 0 4px}
-.rin{margin-left:auto;background:var(--raise);border:0;border-radius:8px;padding:6px 8px;color:var(--accent);max-width:55%;text-align:right;outline:none}
+
+.typebtn{color:var(--fg);font-size:16px}
+.typebtn .caret{color:var(--muted);font-size:11px;margin-left:-2px}

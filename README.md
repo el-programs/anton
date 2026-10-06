@@ -9,7 +9,7 @@ Dein persönlicher Assistent fürs iPhone: Notizen, Gedanken, Erinnerungen, Chec
 3. **Zum Home-Bildschirm** wählen und bestätigen.
 4. Anton ab jetzt immer über das Symbol auf dem Home-Bildschirm starten. Nur so läuft die App im Vollbild und offline.
 
-## Was schon geht (Version 0.3)
+## Was schon geht (Version 0.5)
 
 - Alle sieben Arten: Erinnerung, Notiz, Gedanke, Checkliste, To-do, Challenge, Termin
 - Links, Fotos aus der Mediathek und direkt von der Kamera
@@ -19,7 +19,7 @@ Dein persönlicher Assistent fürs iPhone: Notizen, Gedanken, Erinnerungen, Chec
 - Kalender (Monat und Liste), Statistik, Gute Nacht und Guten Morgen
 - 10 Akzentfarben, automatische Archiv-Bereinigung
 - Dauerhafte Speicherung auf dem Gerät, Start ohne Internet
-- Wecker über den Kurzbefehl „Anton Wecker“ (Anleitung in den Einstellungen)
+- Art eines Eintrags nachträglich ändern (z. B. Notiz → To-do)
 - Sicherung in die Dateien-App, Wiederherstellung und tägliche interne Schnappschüsse
 
 ## Folgt in den nächsten Updates

@@ -83,8 +83,8 @@ const events=[]; // Termine aus Outlook und Proton, Abruf folgt
 const templates=[];
 
 /* ---------- Zustand ---------- */
-const S={view:"dash",cat:"Alle",type:null,ignored:new Set(),accent:"#6aa9a6",calMode:"month",calMonth:new Date(TODAY.getFullYear(),TODAY.getMonth(),1),calSel:new Date(TODAY),calCat:"Alle",calType:null,period:"Jahr",nightFrom:"21:00",alarm:"06:30",cleanup:"90",archF:"Alle",archQ:"",archSel:null,syncedAt:null,lastBackup:null,lastMorning:null,lastNight:null,alarmSet:null,backupSnooze:null,alarmMode:"apple",alarmApp:"Sleepwave"};
-const SAVED_SETTINGS=["accent","nightFrom","alarm","cleanup","lastBackup","lastMorning","lastNight","alarmSet","backupSnooze","alarmMode","alarmApp"];
+const S={view:"dash",cat:"Alle",type:null,ignored:new Set(),accent:"#6aa9a6",calMode:"month",calMonth:new Date(TODAY.getFullYear(),TODAY.getMonth(),1),calSel:new Date(TODAY),calCat:"Alle",calType:null,period:"Jahr",nightFrom:"21:00",cleanup:"90",archF:"Alle",archQ:"",archSel:null,syncedAt:null,lastBackup:null,lastMorning:null,lastNight:null,backupSnooze:null};
+const SAVED_SETTINGS=["accent","nightFrom","cleanup","lastBackup","lastMorning","lastNight","backupSnooze"];
 function setAccent(c){S.accent=c;document.documentElement.style.setProperty("--accent",c)}
 
 /* ---------- Speichern ---------- */
@@ -245,7 +245,7 @@ function sortedOpen(){
 }
 function rowHTML(e){
   const t=e.type;let meta=[];let prog="";
-  if(t==="Checkliste"){const d=e.items.filter(i=>i.d).length;meta.push(d+" von "+e.items.length);prog=`<div class="prog"><i style="width:${e.items.length?d/e.items.length*100:0}%"></i></div>`}
+  if(t==="Checkliste"&&e.items.length){const d=e.items.filter(i=>i.d).length;meta.push(d+" von "+e.items.length);prog=`<div class="prog"><i style="width:${e.items.length?d/e.items.length*100:0}%"></i></div>`}
   if(t==="Challenge"){const ci=chalInfo(e);if(ci){meta.push(`Tag ${ci.day} von ${ci.total} · ${streak(e.chal)} in Folge`);prog=`<div class="prog"><i style="width:${ci.pct}%"></i></div>`}else meta.push("Ohne Zeitraum")}
   const dt=dueText(e);if(dt)meta.unshift(dt);
   const at=attachText(e);if(at)meta.push(at);
@@ -339,9 +339,29 @@ function bindPlus(){
   const b=$("#plusBtn");let t=null,long=false;
   b.addEventListener("pointerdown",()=>{long=false;t=setTimeout(()=>{long=true;openForm({type:"Gedanke"},true)},480)});
   const cancel=()=>clearTimeout(t);
-  b.addEventListener("pointerup",()=>{cancel();if(!long)openTypeSheet()});
+  b.addEventListener("pointerup",()=>{cancel();if(!long)openTypeSheet();else focusTitle()});
   b.addEventListener("pointerleave",cancel);b.addEventListener("pointercancel",cancel);
   b.addEventListener("contextmenu",e=>e.preventDefault());
+}
+// Gemeinsame Auswahl für "Art ändern" (Formular und Detailansicht).
+function typeChangeSheet(cur,act,id){
+  sheet(`<h2>Art ändern</h2><p class="sub">Titel, Text, Anhänge und Privat/Arbeit bleiben erhalten.</p>
+  <div class="grp">${TYPE_ORDER.map(t=>`<button class="r" data-act="${act}" data-v="${t}" ${id?`data-id="${id}"`:""} type="button">${icon(t)}${t}<span class="v a">${cur===t?"✓":""}</span></button>`).join("")}</div>`);
+}
+// Passt Felder an die neue Art an: ohne Fälligkeit keine Fälligkeit, Termine brauchen einen Beginn.
+function fitToType(o,type){
+  const T=TYPES[type];
+  if(!T.due)o.due=null;
+  if(!T.rep)o.repeat="Nie";
+  if(type==="Termin"&&!o.due)o.due=at(NOW,NOW.getHours()+1);
+}
+function convertEntry(id,type){
+  const e=byId(id);if(!e||e.type===type)return;
+  const prev={type:e.type,due:e.due,repeat:e.repeat,chal:e.chal};
+  e.type=type;fitToType(e,type);
+  if(type==="Challenge"&&!e.chal)e.chal={start:null,end:null,days:new Set(),result:null};
+  closeSheet();render();
+  toast(`Jetzt ${type}${type==="Termin"&&!prev.due?" · Beginn bitte prüfen":""}`,()=>{Object.assign(e,prev);render()});
 }
 function openTypeSheet(){
   sheet(`<h2>Neuer Eintrag</h2><p class="sub">Was möchtest du festhalten?</p>
@@ -364,8 +384,9 @@ function openForm(init,quick,editId){
      period:!!(init.chal&&init.chal.start),pstart:init.chal&&init.chal.start?new Date(init.chal.start):new Date(TODAY),pend:init.chal&&init.chal.end?new Date(init.chal.end):addD(TODAY,29),err:false,tpl:false,quick};
   if(F.type==="Challenge"&&!editId)F.due=null;
   page(formHTML(),"form");
-  if(quick||!editId)setTimeout(()=>{const t=$("#fTitle");t&&t.focus()},300);
+  if(!editId)focusTitle();
 }
+function focusTitle(){const t=$("#layer .page.form #fTitle");if(t){t.focus({preventScroll:true});const n=t.value.length;try{t.setSelectionRange(n,n)}catch(_){}}}
 function formHTML(){
   const t=F.type,T=TYPES[t];
   let rows="";
@@ -380,7 +401,7 @@ function formHTML(){
   rows+=`<button class="r" data-act="fStar" type="button"><span class="ri">${L("star",16)}</span>Wichtig<span class="tog${F.star?" on":""}"></span></button>`;
   const items=t==="Checkliste"?`<div class="cap2">Punkte</div><div class="grp">${F.items.map((i,n)=>`<div class="ci${i.d?" done":""}"><button class="box" data-act="fItem" data-v="${n}" type="button" aria-label="Abhaken">${i.d?"✓":""}</button><span class="cn">${esc(i.t)}</span><span class="q">${esc(i.q)}</span><button data-act="fItemDel" data-v="${n}" type="button" class="muted" aria-label="Entfernen">✕</button></div>`).join("")||'<div class="empty">Noch keine Punkte</div>'}</div>
     <div class="addline"><input class="inp" id="fItemT" placeholder="Neuer Punkt"><input class="inp q" id="fItemQ" placeholder="Menge"><button data-act="fItemAdd" type="button" aria-label="Punkt hinzufügen">+</button></div>`:"";
-  return `<div class="nav"><button class="x" data-act="closePage" type="button">Abbrechen</button><span class="mid">${icon(t)}${t}</span><button class="ok" data-act="fSave" type="button">Sichern</button></div>
+  return `<div class="nav"><button class="x" data-act="closePage" type="button">Abbrechen</button><button class="mid typebtn" data-act="fTypePick" type="button" aria-label="Art ändern">${icon(t)}${t}<span class="caret">▾</span></button><button class="ok" data-act="fSave" type="button">Sichern</button></div>
   <div class="pad">
   <input class="f-title" id="fTitle" placeholder="${t==="Gedanke"?"Was geht dir durch den Kopf?":"Titel"}" value="${esc(F.title)}" autocomplete="off">
   ${F.err?'<div class="err">Bitte gib einen Titel ein.</div>':""}
@@ -455,6 +476,7 @@ function detailHTML(id,ro){
     ${TYPES[t].due&&e.due?`<button class="r" data-act="snooze" data-id="${id}" type="button"><span class="ri">${L("clock",16)}</span>Zurückstellen<span class="v">›</span></button>`:""}
     <button class="r" data-act="dStar" data-id="${id}" type="button"><span class="ri">${L("star",16)}</span>${e.star?"Markierung entfernen":"Als wichtig markieren"}<span class="v"></span></button>
     <button class="r" data-act="dTpl" data-id="${id}" type="button"><span class="ri">${L("template",16)}</span>Als Vorlage speichern<span class="v"></span></button>
+    <button class="r" data-act="dTypePick" data-id="${id}" type="button"><span class="ri">${L("all",16)}</span>Art ändern<span class="v">${t} ›</span></button>
     <button class="r" data-act="dDup" data-id="${id}" type="button"><span class="ri">${L("copy",16)}</span>Duplizieren<span class="v"></span></button></div>
     <div class="btnrow">${t==="Challenge"?"":`<button class="btn" data-act="dDone" data-id="${id}" type="button">Erledigt</button>`}<button class="btn red" data-act="dDel" data-id="${id}" type="button" ${t==="Challenge"?'style="grid-column:1/-1"':""}>Löschen</button></div>`}
   return html+"</div>";
@@ -575,9 +597,6 @@ function settingsHTML(){
    <button class="r" data-act="ignored" type="button"><span class="ri">${L("eye",16)}</span>Ignorierte Termine<span class="v">${S.ignored.size} ›</span></button></div>
   <div class="cap2">Abend und Morgen</div><div class="grp">
    <div class="r"><span class="ri" style="background:#8e8e9324">${SV.moon}</span>Gute Nacht ab<input type="time" id="sNight" value="${S.nightFrom}"></div>
-   <div class="r"><span class="ri">${L("alarm",16)}</span>Wecker<select id="sAlarmMode"><option value="apple"${S.alarmMode==="apple"?" selected":""}>Apple-Wecker</option><option value="app"${S.alarmMode==="app"?" selected":""}>Andere App</option></select></div>
-   ${S.alarmMode==="app"?`<div class="r"><span class="ri">${L("note",16)}</span>Name der App<input class="rin" id="sAlarmApp" value="${esc(S.alarmApp)}" autocomplete="off"></div>`:""}
-   <button class="r" data-act="shortcut" type="button"><span class="ri">${L("template",16)}</span>Kurzbefehl einrichten<span class="v">›</span></button>
    <button class="r" data-act="morning" type="button"><span class="ri" style="background:#ffd60a24">${SV.sun}</span>Guten Morgen ansehen<span class="v">›</span></button></div>
   <div class="cap2">Daten</div><div class="grp">
    <button class="r" data-act="backup" type="button"><span class="ri">${L("down",16)}</span>Sicherung erstellen<span class="v">${S.lastBackup?(daysBetween(S.lastBackup,TODAY)===0?"heute":"vor "+daysBetween(S.lastBackup,TODAY)+" Tagen"):"noch keine"} ›</span></button>
@@ -590,16 +609,9 @@ function settingsHTML(){
 function openSettings(){page(settingsHTML(),"settings");bindSettings()}
 function refreshSettings(){persist();const p=$("#layer .page.settings");if(!p)return;const st=p.scrollTop;p.innerHTML=settingsHTML();p.scrollTop=st;bindSettings()}
 function bindSettings(){
-  const am=$("#sAlarmMode");am&&am.addEventListener("change",()=>{S.alarmMode=am.value;refreshSettings();toast(am.value==="app"?"Anton startet künftig "+S.alarmApp:"Anton stellt künftig den Apple-Wecker")});
-  const an=$("#sAlarmApp");an&&an.addEventListener("change",()=>{S.alarmApp=an.value.trim()||"Sleepwave";persist()});const n=$("#sNight");n&&n.addEventListener("change",()=>{S.nightFrom=n.value||S.nightFrom;persist();toast("Gute Nacht erscheint ab "+n.value)});const c=$("#sClean");c&&c.addEventListener("change",()=>{S.cleanup=c.value;persist();cleanupArchive();render();toast(c.value==="0"?"Automatische Bereinigung aus":"Archiv wird automatisch bereinigt")})}
+const n=$("#sNight");n&&n.addEventListener("change",()=>{S.nightFrom=n.value||S.nightFrom;persist();toast("Gute Nacht erscheint ab "+n.value)});const c=$("#sClean");c&&c.addEventListener("change",()=>{S.cleanup=c.value;persist();cleanupArchive();render();toast(c.value==="0"?"Automatische Bereinigung aus":"Archiv wird automatisch bereinigt")})}
 
 /* ---------- Gute Nacht / Guten Morgen ---------- */
-// Startet den Kurzbefehl „Anton Wecker“ und übergibt die Weckzeit als Text, z. B. "06:30".
-const SHORTCUT="Anton Wecker";
-// Im Modus "app" stellt eine andere Wecker-App die Zeit; der Kurzbefehl startet sie nur.
-const appAlarmURL=()=>`shortcuts://run-shortcut?name=${encodeURIComponent(SHORTCUT)}`;
-const alarmURL=t=>`shortcuts://run-shortcut?name=${encodeURIComponent(SHORTCUT)}&input=text&text=${encodeURIComponent(t)}`;
-function sleepText(){const [h,m]=S.alarm.split(":").map(Number);const a=new Date();a.setHours(h,m,0,0);if(a<=new Date())a.setDate(a.getDate()+1);const mins=Math.round((a-new Date())/6e4);return Math.floor(mins/60)+" Std. "+(mins%60)+" Min. bis zum Wecker"}
 function nightHTML(){
   const tm=addD(TODAY,1);const its=dayItems(tm);
   const chals=entries.filter(e=>isOpen(e)&&e.type==="Challenge"&&chalInfo(e)).map(e=>({t:null,title:e.title+" · Tag "+(chalInfo(e).day+1),s:"Challenge",col:TYPES.Challenge.c,act:"open",id:e.id,type:"Challenge"}));
@@ -608,21 +620,9 @@ function nightHTML(){
   return `<div class="nav"><button class="x" data-act="closePage" type="button">‹ Zurück</button><span></span><span></span></div>
   <div class="gn-head" style="padding-top:0"><span class="mi" style="background:#8e8e9322">${SV.moon}</span>Gute Nacht</div>
   <div class="gn-big">Morgen, ${WDL[tm.getDay()]} ${dmy(tm)}</div>
-  ${alarmBlock()}
   <div class="sec" style="margin-top:8px"><span>Morgen</span><span>${all.length}</span></div><div class="pad">${all.map(liHTML).join("")||'<div class="empty">Morgen ist nichts geplant</div>'}</div>`;
 }
-function alarmBlock(){
-  const back='danach unten über den Home-Balken nach rechts wischen · <button class="lnk" data-act="shortcut" type="button">einrichten</button>';
-  const last=S.alarmSet&&S.alarmSet.day===key(TODAY);
-  if(S.alarmMode==="app")return `<div class="alarm"><div class="lb">Wecker</div><div class="appname">${esc(S.alarmApp)}</div>
-    <div class="h">Weckzeit, Ton und Lautstärke stellst du in ${esc(S.alarmApp)} ein.</div>
-    <a class="btn" href="${appAlarmURL()}" data-act="alarmGo"><span style="display:inline-flex;vertical-align:-3px;margin-right:6px">${L("alarm",18)}</span>${esc(S.alarmApp)} starten</a>
-    <div class="sm">${last?"Heute schon gestartet · ":""}${back}</div></div>`;
-  return `<div class="alarm"><div class="lb">Wecker</div><input type="time" id="nAlarm" value="${S.alarm}" aria-label="Weckzeit"><div class="h" id="nSleep">${sleepText()}</div>
-    <a class="btn" id="nAlarmGo" href="${alarmURL(S.alarm)}" data-act="alarmGo"><span style="display:inline-flex;vertical-align:-3px;margin-right:6px">${L("alarm",18)}</span>Wecker in Uhr-App stellen</a>
-    <div class="sm">${last?`Zuletzt gestellt: ${S.alarmSet.time} · `:""}${back}</div></div>`;
-}
-function openNight(){page(nightHTML(),"night");const a=$("#nAlarm");if(a)a.addEventListener("input",()=>{S.alarm=a.value||S.alarm;$("#nSleep").textContent=sleepText();$("#nAlarmGo").href=alarmURL(S.alarm);persist()})}
+function openNight(){page(nightHTML(),"night")}
 function morningHTML(){
   const ti=todayItems();const due=entries.filter(e=>isOpen(e)&&e.type!=="Termin"&&e.due&&same(e.due,TODAY)&&!isOver(e));const over=entries.filter(isOver);
   const chals=entries.filter(e=>isOpen(e)&&e.type==="Challenge"&&chalInfo(e));
@@ -695,6 +695,10 @@ document.addEventListener("click",ev=>{
     fromTpl:()=>openTplSheet(),
     useTpl:()=>{const t=templates[+v];openForm({...t,items:t.items.map(i=>({...i,d:false}))})},
     fCat:()=>{readForm();F.cat=v;refreshForm()},
+    fTypePick:()=>{readForm();typeChangeSheet(F.type,"fTypeSet")},
+    fTypeSet:()=>{F.type=v;fitToType(F,v);if(v==="Challenge"&&!F.editId)F.due=null;closeSheet();refreshForm()},
+    dTypePick:()=>typeChangeSheet(byId(id).type,"dTypeSet",id),
+    dTypeSet:()=>convertEntry(+id,v),
     fStar:()=>{F.star=!F.star;refreshForm()},
     fPeriod:()=>{F.period=!F.period;refreshForm()},
     fTpl:()=>{F.tpl=!F.tpl;refreshForm()},
@@ -742,20 +746,6 @@ document.addEventListener("click",ev=>{
     icsInfo:()=>sheet(`<h2>${v}-Kalender</h2><p class="sub">Schreibgeschütztes Abo per ICS-Link</p><p class="note">Hier fügst du später den Freigabe-Link aus ${v} ein. Anton ruft ihn bei jedem Start ab und zeigt die Termine nur an.</p><p class="note">Diese Funktion folgt in einem der nächsten Updates.</p><button class="btn ghost" data-act="closeSheet">Schließen</button>`),
     ignored:()=>{const list=events.filter(x=>S.ignored.has(x.id));sheet(`<h2>Ignorierte Termine</h2><p class="sub">Einblenden holt den Termin zurück ins Dashboard.</p><div class="grp">${list.map(x=>`<div class="r"><span class="ri" style="background:${SRC[x.src]}17;color:${SRC[x.src]}">${L("cal",16)}</span><span>${esc(x.title)}<br><span class="muted" style="font-size:12px">${dmy(x.start)} · ${x.src}</span></span><button class="v a" data-act="unignore" data-id="${x.id}">Einblenden</button></div>`).join("")||'<div class="empty">Keine ignorierten Termine. Tippe im Dashboard auf einen Outlook- oder Proton-Termin, um ihn auszublenden.</div>'}</div>`)},
     unignore:()=>{S.ignored.delete(id);A.ignored();refreshSettings();render()},
-    shortcut:()=>sheet(S.alarmMode==="app"?`<h2>Kurzbefehl für ${esc(S.alarmApp)}</h2><p class="sub">Anton startet ${esc(S.alarmApp)} über den Kurzbefehl „Anton Wecker“.</p>
-      <ol class="steps"><li>Stelle in <b>${esc(S.alarmApp)}</b> deine Weckzeit (z. B. Mo–Fr), den Ton und die Lautstärke ein.</li>
-      <li>Öffne in <b>Kurzbefehle</b> den Kurzbefehl <b>Anton Wecker</b>.</li>
-      <li>Entferne die Aktionen <b>Datumsangaben abrufen</b> und <b>Wecker erstellen</b> über das ✕ rechts.</li>
-      <li>Suche unten nach <b>${esc(S.alarmApp)}</b> und füge die Aktion <b>${esc(S.alarmApp)} starten</b> hinzu.</li></ol>
-      <p class="note">Der Name „Anton Wecker“ muss gleich bleiben. Zurück zu Anton kommst du, indem du unten über den Home-Balken nach rechts wischst.</p>
-      <a class="btn" href="${appAlarmURL()}" data-act="alarmGo">Jetzt testen</a>`:`<h2>Wecker-Kurzbefehl</h2><p class="sub">Einmal einrichten, danach stellt Anton den Wecker mit einem Tipp.</p>
-      <ol class="steps"><li>Öffne die App <b>Kurzbefehle</b> und tippe oben rechts auf <b>+</b>.</li>
-      <li>Tippe oben auf den Namen und nenne den Kurzbefehl genau <b>Anton Wecker</b>.</li>
-      <li>Füge die Aktion <b>Datumsangaben abrufen</b> hinzu. Als Eingabe wählst du <b>Kurzbefehleingabe</b>.</li>
-      <li>Füge die Aktion <b>Wecker erstellen</b> hinzu und setze als Uhrzeit die <b>Datumsangaben</b> aus Schritt 3. Als Bezeichnung kannst du „Anton“ eintragen.</li>
-      <li>Tippe unten auf das Info-Symbol und stelle bei <b>Eingabe empfangen</b> den Typ <b>Text</b> ein. Dann auf <b>Fertig</b>.</li></ol>
-      <p class="note">Danach hier testen. iOS fragt beim ersten Mal, ob Anton den Kurzbefehl öffnen darf. Zurück zu Anton kommst du, indem du unten über den Home-Balken nach rechts wischst.</p>
-      <a class="btn" href="${alarmURL(S.alarm)}" data-act="alarmGo">Testen mit ${S.alarm}</a>`),
     morning:()=>page(morningHTML(),"morning"),
     backup:()=>prepareBackup(),
     backupShare:()=>shareBackup(),
@@ -767,7 +757,6 @@ document.addEventListener("click",ev=>{
     snapDo:()=>applySnapshot(+v),
     tplList:()=>sheet(`<h2>Vorlagen</h2><p class="sub">Neue Vorlagen speicherst du im Formular oder in der Detailansicht.</p><div class="grp">${templates.map((t,i)=>`<div class="r">${icon(t.type)}<span>${esc(t.title||t.type)}</span><button class="v" data-act="tplDel" data-v="${i}" style="color:var(--danger)">Entfernen</button></div>`).join("")||'<div class="empty">Keine Vorlagen</div>'}</div>`),
     tplDel:()=>{templates.splice(+v,1);A.tplList();refreshSettings()},
-    alarmGo:()=>{const app=S.alarmMode==="app";S.alarmSet={day:key(TODAY),time:app?S.alarmApp:S.alarm};persist();location.href=app?appAlarmURL():alarmURL(S.alarm)},
     photo:()=>{const u=photoUrls.get(v);if(u)sheet(`<img src="${u}" alt="Foto" style="width:100%;border-radius:14px;display:block;margin-top:24px">`)},
     fPhotoDel:()=>{const [id]=F.photos.splice(+v,1);pendingPhotos.delete(id);refreshForm()}
   };
@@ -780,7 +769,7 @@ document.addEventListener("keydown",e=>{
 });
 
 /* ---------- Start ---------- */
-const VERSION="0.4.1";
+const VERSION="0.5";
 function cleanupArchive(){
   const n=+S.cleanup;if(!n)return;
   for(let i=entries.length-1;i>=0;i--){const e=entries[i];if(!isOpen(e)&&e.archived&&daysBetween(e.archived,TODAY)>n)entries.splice(i,1)}
