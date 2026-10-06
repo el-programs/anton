@@ -16,7 +16,7 @@ Dein persönlicher Assistent fürs iPhone: Notizen, Gedanken, Erinnerungen, Chec
 - Wischen zum Erledigen oder Löschen, Verschieben am Griff, Archiv mit Suche
 - Fälligkeit, Wiederholung, Zurückstellen, Wichtig-Stern, Vorlagen
 - Challenges mit Zeitraum, „Heute geschafft“ und Bewertung
-- Kalender (Monat und Liste), Statistik, Gute Nacht und Guten Morgen
+- Kalender (Monat und Liste), Statistik, Guten Morgen
 - 10 Akzentfarben, automatische Archiv-Bereinigung
 - Dauerhafte Speicherung auf dem Gerät, Start ohne Internet
 - Art eines Eintrags nachträglich ändern (z. B. Notiz → To-do)

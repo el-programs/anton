@@ -83,8 +83,8 @@ const events=[]; // Termine aus Outlook und Proton, Abruf folgt
 const templates=[];
 
 /* ---------- Zustand ---------- */
-const S={view:"dash",cat:"Alle",type:null,ignored:new Set(),accent:"#6aa9a6",calMode:"month",calMonth:new Date(TODAY.getFullYear(),TODAY.getMonth(),1),calSel:new Date(TODAY),calCat:"Alle",calType:null,period:"Jahr",nightFrom:"21:00",cleanup:"90",archF:"Alle",archQ:"",archSel:null,syncedAt:null,lastBackup:null,lastMorning:null,lastNight:null,backupSnooze:null};
-const SAVED_SETTINGS=["accent","nightFrom","cleanup","lastBackup","lastMorning","lastNight","backupSnooze"];
+const S={view:"dash",cat:"Alle",type:null,ignored:new Set(),accent:"#6aa9a6",calMode:"month",calMonth:new Date(TODAY.getFullYear(),TODAY.getMonth(),1),calSel:new Date(TODAY),calCat:"Alle",calType:null,period:"Jahr",cleanup:"90",archF:"Alle",archQ:"",archSel:null,syncedAt:null,lastBackup:null,lastMorning:null,backupSnooze:null};
+const SAVED_SETTINGS=["accent","cleanup","lastBackup","lastMorning","backupSnooze"];
 function setAccent(c){S.accent=c;document.documentElement.style.setProperty("--accent",c)}
 
 /* ---------- Speichern ---------- */
@@ -265,7 +265,7 @@ function renderDash(){
   const chips=["Alle","Privat","Arbeit"].map(c=>`<button class="chip${S.cat===c?" on":""}" data-act="cat" data-v="${c}">${c}</button>`).join("")+`<button class="chip${S.type?" on":""}" data-act="typeFilter">${S.type?esc(S.type)+" ✕":"Art ▾"}</button>`;
   $("#app").innerHTML=`
   <header class="head"><h1>${WDL[NOW.getDay()]}</h1><span class="date">${dmy(NOW)} · ${dueN} fällig</span><span class="sp"></span>
-  <button class="iconbtn" data-act="night" aria-label="Gute Nacht">${SV.moon}</button><button class="iconbtn" data-act="settings" aria-label="Einstellungen">${SV.gear}</button></header>
+  <button class="iconbtn" data-act="settings" aria-label="Einstellungen">${SV.gear}</button></header>
   ${backupDue()?`<div class="bk"><span class="ri">${L("down",16)}</span><div class="bkt"><b>Zeit für eine Sicherung</b><span>${S.lastBackup?"Letzte Sicherung vor "+daysBetween(new Date(S.lastBackup),TODAY)+" Tagen":"Noch keine Sicherung vorhanden"}</span></div><button class="bkb" data-act="backup" type="button">Sichern</button><button class="bkx" data-act="bkLater" type="button" aria-label="Heute nicht mehr erinnern">✕</button></div>`:""}
   <div class="chips">${chips}</div>
   <div class="sec"><span>Heute</span><b>${ti.length} ${ti.length===1?"Termin":"Termine"}</b></div>
@@ -595,8 +595,7 @@ function settingsHTML(){
    <button class="r" data-act="icsInfo" data-v="Outlook" type="button"><span class="ri" style="background:#7d9cc417;color:#7d9cc4">${L("cal",16)}</span>Outlook<span class="v">nicht verbunden ›</span></button>
    <button class="r" data-act="icsInfo" data-v="Proton" type="button"><span class="ri" style="background:#a593c417;color:#a593c4">${L("cal",16)}</span>Proton<span class="v">nicht verbunden ›</span></button>
    <button class="r" data-act="ignored" type="button"><span class="ri">${L("eye",16)}</span>Ignorierte Termine<span class="v">${S.ignored.size} ›</span></button></div>
-  <div class="cap2">Abend und Morgen</div><div class="grp">
-   <div class="r"><span class="ri" style="background:#8e8e9324">${SV.moon}</span>Gute Nacht ab<input type="time" id="sNight" value="${S.nightFrom}"></div>
+  <div class="cap2">Morgen</div><div class="grp">
    <button class="r" data-act="morning" type="button"><span class="ri" style="background:#ffd60a24">${SV.sun}</span>Guten Morgen ansehen<span class="v">›</span></button></div>
   <div class="cap2">Daten</div><div class="grp">
    <button class="r" data-act="backup" type="button"><span class="ri">${L("down",16)}</span>Sicherung erstellen<span class="v">${S.lastBackup?(daysBetween(S.lastBackup,TODAY)===0?"heute":"vor "+daysBetween(S.lastBackup,TODAY)+" Tagen"):"noch keine"} ›</span></button>
@@ -609,20 +608,9 @@ function settingsHTML(){
 function openSettings(){page(settingsHTML(),"settings");bindSettings()}
 function refreshSettings(){persist();const p=$("#layer .page.settings");if(!p)return;const st=p.scrollTop;p.innerHTML=settingsHTML();p.scrollTop=st;bindSettings()}
 function bindSettings(){
-const n=$("#sNight");n&&n.addEventListener("change",()=>{S.nightFrom=n.value||S.nightFrom;persist();toast("Gute Nacht erscheint ab "+n.value)});const c=$("#sClean");c&&c.addEventListener("change",()=>{S.cleanup=c.value;persist();cleanupArchive();render();toast(c.value==="0"?"Automatische Bereinigung aus":"Archiv wird automatisch bereinigt")})}
+const c=$("#sClean");c&&c.addEventListener("change",()=>{S.cleanup=c.value;persist();cleanupArchive();render();toast(c.value==="0"?"Automatische Bereinigung aus":"Archiv wird automatisch bereinigt")})}
 
 /* ---------- Gute Nacht / Guten Morgen ---------- */
-function nightHTML(){
-  const tm=addD(TODAY,1);const its=dayItems(tm);
-  const chals=entries.filter(e=>isOpen(e)&&e.type==="Challenge"&&chalInfo(e)).map(e=>({t:null,title:e.title+" · Tag "+(chalInfo(e).day+1),s:"Challenge",col:TYPES.Challenge.c,act:"open",id:e.id,type:"Challenge"}));
-  const stars=entries.filter(e=>isOpen(e)&&e.star&&e.type!=="Termin"&&!(e.due&&same(e.due,tm))).map(e=>({t:null,title:e.title,s:"★ "+e.type,col:TYPES[e.type].c,act:"open",id:e.id,type:e.type}));
-  const all=its.concat(chals,stars);
-  return `<div class="nav"><button class="x" data-act="closePage" type="button">‹ Zurück</button><span></span><span></span></div>
-  <div class="gn-head" style="padding-top:0"><span class="mi" style="background:#8e8e9322">${SV.moon}</span>Gute Nacht</div>
-  <div class="gn-big">Morgen, ${WDL[tm.getDay()]} ${dmy(tm)}</div>
-  <div class="sec" style="margin-top:8px"><span>Morgen</span><span>${all.length}</span></div><div class="pad">${all.map(liHTML).join("")||'<div class="empty">Morgen ist nichts geplant</div>'}</div>`;
-}
-function openNight(){page(nightHTML(),"night")}
 function morningHTML(){
   const ti=todayItems();const due=entries.filter(e=>isOpen(e)&&e.type!=="Termin"&&e.due&&same(e.due,TODAY)&&!isOver(e));const over=entries.filter(isOver);
   const chals=entries.filter(e=>isOpen(e)&&e.type==="Challenge"&&chalInfo(e));
@@ -687,7 +675,6 @@ document.addEventListener("click",ev=>{
     openROFromSheet:()=>{closeSheet();openDetail(+id,true)},
     event:()=>{const x=events.find(e=>e.id===id);sheet(`<h2>${esc(x.title)}</h2><p class="sub">${WDL[x.start.getDay()]}, ${dmy(x.start)} · ${hm(x.start)} · aus ${x.src}</p><p class="note">Termine aus ${x.src} sind nur zum Ansehen. Du kannst sie in Anton ausblenden, in ${x.src} bleiben sie bestehen.</p><button class="btn ghost" data-act="ignore" data-id="${x.id}">In Anton ignorieren</button>`)},
     ignore:()=>{S.ignored.add(id);closeSheet();render();toast("Termin ausgeblendet",()=>{S.ignored.delete(id);render()})},
-    night:()=>openNight(),
     settings:()=>openSettings(),
     closePage:()=>closePage(),
     closeSheet:()=>closeSheet(),
@@ -769,20 +756,16 @@ document.addEventListener("keydown",e=>{
 });
 
 /* ---------- Start ---------- */
-const VERSION="0.5";
+const VERSION="0.5.1";
 function cleanupArchive(){
   const n=+S.cleanup;if(!n)return;
   for(let i=entries.length-1;i>=0;i--){const e=entries[i];if(!isOpen(e)&&e.archived&&daysBetween(e.archived,TODAY)>n)entries.splice(i,1)}
 }
-// Abends Gute Nacht, morgens beim ersten Öffnen des Tages Guten Morgen.
+// Beim ersten Öffnen des Tages Guten Morgen (nicht spät abends oder nachts).
 function autoViews(){
   if(stack.length)return;
-  const [nh,nm]=S.nightFrom.split(":").map(Number);const mins=NOW.getHours()*60+NOW.getMinutes();
-  const night=mins>=nh*60+nm||NOW.getHours()<4;
-  const evening=key(NOW.getHours()<4?addD(TODAY,-1):TODAY);
-  if(night){if(S.lastNight!==evening){S.lastNight=evening;openNight()}}
-  else if(S.lastMorning!==key(TODAY)&&entries.some(isOpen)){S.lastMorning=key(TODAY);page(morningHTML(),"morning")}
-  persist();
+  const h=NOW.getHours();if(h>=21||h<4)return;
+  if(S.lastMorning!==key(TODAY)&&entries.some(isOpen)){S.lastMorning=key(TODAY);page(morningHTML(),"morning");persist()}
 }
 let shownDay=null;
 document.addEventListener("visibilitychange",()=>{
