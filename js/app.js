@@ -446,7 +446,10 @@ document.addEventListener("paste",ev=>{
   else{const p=$("#layer .page.detail");const e=p&&byId(p.dataset.id);if(!e)return;e.items.push(...items);refreshDetail(e.id)}
   toast(items.length+(items.length===1?" Punkt":" Punkte")+" eingefügt");
 });
+// Textfeld wächst mit dem Inhalt, damit man im Formular nicht doppelt scrollen muss.
+function autoGrow(el){el.style.height="auto";el.style.height=(el.scrollHeight+el.offsetHeight-el.clientHeight)+"px"}
 function bindFormFiles(){
+  const body=document.getElementById("fBody");if(body){autoGrow(body);body.addEventListener("input",()=>autoGrow(body))}
   ["fLib","fCam"].forEach(id=>{const el=document.getElementById(id);if(!el)return;el.addEventListener("change",()=>{
     const files=[...el.files];if(!files.length)return;let left=files.length;
     files.forEach(f=>shrink(f,blob=>{if(blob){const id=newPhotoId();pendingPhotos.set(id,blob);F.photos.push(id)}if(--left===0)refreshForm()}));
@@ -777,7 +780,7 @@ document.addEventListener("keydown",e=>{
 });
 
 /* ---------- Start ---------- */
-const VERSION="0.5.2";
+const VERSION="0.5.3";
 function cleanupArchive(){
   const n=+S.cleanup;if(!n)return;
   for(let i=entries.length-1;i>=0;i--){const e=entries[i];if(!isOpen(e)&&e.archived&&daysBetween(e.archived,TODAY)>n)entries.splice(i,1)}
