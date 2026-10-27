@@ -425,6 +425,27 @@ function readForm(){
   if(g("fEnd")&&g("fEnd").value)F.pend=new Date(g("fEnd").value+"T00:00");
 }
 function refreshForm(){readForm();if(F.title.trim())F.err=false;const p=$("#layer .page.form");const st=p.scrollTop;p.innerHTML=formHTML();p.scrollTop=st;bindFormFiles();hydratePhotos(p)}
+// Zerlegt eine eingefügte Liste (z. B. aus einem Rezept oder Chat) in Checklisten-Punkte mit Menge.
+const UNITS="g|kg|mg|ml|l|liter|el|tl|stück|stk|pck|packung|packungen|dose|dosen|becher|bund|prise|prisen|glas|gläser|flasche|flaschen|scheibe|scheiben|zehe|zehen|tüte|tüten|beutel|kopf|köpfe";
+const QTY=new RegExp(`^((?:ca\\.\\s*)?\\d+(?:[.,]\\d+)?(?:\\s*[-–]\\s*\\d+(?:[.,]\\d+)?)?\\s*(?:(?:${UNITS})\\.?(?=\\s))?|½|¼|¾)\\s+(.+)$`,"i");
+function parseList(text){
+  const BUL=/^(?:[•\-*–·▪◦●]|\d+[.)])\s+/;
+  let lines=text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  if(lines.some(l=>BUL.test(l)))lines=lines.filter(l=>BUL.test(l)); // Überschriften ohne Aufzählungszeichen weglassen
+  return lines.map(l=>{
+    l=l.replace(BUL,"");let d=false;
+    const cb=l.match(/^\[( |x|X)\]\s*/);if(cb){d=cb[1]!==" ";l=l.slice(cb[0].length)}
+    const m=l.match(QTY);return m?{t:m[2].trim(),q:m[1].trim(),d}:{t:l,q:"",d};
+  }).filter(i=>i.t);
+}
+document.addEventListener("paste",ev=>{
+  const id=ev.target&&ev.target.id;if(id!=="fItemT"&&id!=="dItemT")return;
+  const text=(ev.clipboardData||window.clipboardData).getData("text");if(!/\n/.test(text.trim()))return;
+  ev.preventDefault();const items=parseList(text);if(!items.length)return;
+  if(id==="fItemT"){readForm();F.items.push(...items);refreshForm()}
+  else{const p=$("#layer .page.detail");const e=p&&byId(p.dataset.id);if(!e)return;e.items.push(...items);refreshDetail(e.id)}
+  toast(items.length+(items.length===1?" Punkt":" Punkte")+" eingefügt");
+});
 function bindFormFiles(){
   ["fLib","fCam"].forEach(id=>{const el=document.getElementById(id);if(!el)return;el.addEventListener("change",()=>{
     const files=[...el.files];if(!files.length)return;let left=files.length;
@@ -756,7 +777,7 @@ document.addEventListener("keydown",e=>{
 });
 
 /* ---------- Start ---------- */
-const VERSION="0.5.1";
+const VERSION="0.5.2";
 function cleanupArchive(){
   const n=+S.cleanup;if(!n)return;
   for(let i=entries.length-1;i>=0;i--){const e=entries[i];if(!isOpen(e)&&e.archived&&daysBetween(e.archived,TODAY)>n)entries.splice(i,1)}
